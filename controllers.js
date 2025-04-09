@@ -59,32 +59,61 @@ class GamesController {
 
     static async filterGames(req, res) {
         try {
+            const { search, metacritic_rating, minRate, maxRate } = req.query;
 
-            // const filter = req.query
-            // if contains ',' => this is genres and split them to the array
-            // else this title-developer-publisher-year
-            const { game_title, genres, release_year, developer, publisher, metacritic_rating, minRate, maxRate } = req.query;
+            let searchFilter = {};
+            let genresFilter = {};
 
-            const titleFilter = game_title ? { game_title: game_title } : {};
-            const genresFilter = genres ? { genres: { $all: genres.split(",") } } : {};
-            const yearFilter = release_year ? { release_year: release_year } : {};
-            const simpleRatingFilter = metacritic_rating ? { metacritic_rating: metacritic_rating } : {};
-            const developerFilter = developer ? { developer: developer } : {};
-            const publisherFilter = publisher ? { publisher: publisher } : {};
+            // If `search` is provided, we process it
+            if (search) {
+                const searchParts = search.split(',').map(part => part.trim()); // Split input by commas and trim
 
+                // First part is treated as the main search term (game title, developer, publisher, etc.)
+                const mainSearchTerm = searchParts[0];
+                const regex = new RegExp(mainSearchTerm, "i");
+
+                searchFilter = {
+                    $or: [
+                        { game_title: regex },
+                        { developer: regex },
+                        { publisher: regex },
+                        { release_year: regex }
+                    ]
+                };
+
+                // If any parts of the input after the first are genres, we treat them as genres
+                const genres = searchParts.slice(1); // Everything after the first part is treated as genres
+                if (genres.length > 0) {
+                    genresFilter = { genres: { $in: genres } }; // Match any of the provided genres
+                }
+            }
+
+            const simpleRatingFilter = metacritic_rating ? { metacritic_rating: Number(metacritic_rating) } : {};
+
+            // Process rating range
             const ratingFilter = {};
-            if (minRate) ratingFilter.$gte = minRate;
-            if (maxRate) ratingFilter.$lte = maxRate;
+            if (minRate) ratingFilter.$gte = Number(minRate);
+            if (maxRate) ratingFilter.$lte = Number(maxRate);
             const ratingFinalFilter = Object.keys(ratingFilter).length > 0 ? { metacritic_rating: ratingFilter } : {};
 
-            const filters = { ...titleFilter, ...genresFilter, ...yearFilter, ...developerFilter, ...publisherFilter, ...simpleRatingFilter, ...ratingFinalFilter };
+            // Combine all filters
+            const filters = {
+                ...searchFilter,
+                ...genresFilter,
+                ...simpleRatingFilter,
+                ...ratingFinalFilter,
+            };
 
+            // Fetch filtered games from the database
             const filteredGames = await GamesDAO.getGamesByFilter(filters);
             res.json(filteredGames);
         } catch (err) {
             res.status(500).json({ error: err.message });
         }
     }
+
+
+
 
     static async deleteGame(req, res) {
         try {
