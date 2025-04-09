@@ -60,6 +60,9 @@ class GamesController {
     static async filterGames(req, res) {
         try {
 
+            // const filter = req.query
+            // if contains ',' => this is genres and split them to the array
+            // else this title-developer-publisher-year
             const { game_title, genres, release_year, developer, publisher, metacritic_rating, minRate, maxRate } = req.query;
 
             const titleFilter = game_title ? { game_title: game_title } : {};
